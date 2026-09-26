@@ -1,1 +1,0 @@
-"use strict";(globalThis.webpackChunkdata_voyage_github_io||=[]).push([[1903],{1912(a){a.exports=JSON.parse('{"blogBasePath":"/data-voyage/blog","blogTitle":"Blog","authorsListPath":"/data-voyage/blog/authors"}')}}]);
