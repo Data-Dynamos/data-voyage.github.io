@@ -1,0 +1,1 @@
+"use strict";(globalThis.webpackChunkdata_voyage_github_io||=[]).push([[2634],{192(a,t,u){u.r(t),u.d(t,{default:()=>d});u(6540);var o=u(612),r=u(4848);function d(){return(0,r.jsx)(o.rd,{to:"/docs/tour_agenda"})}}}]);
