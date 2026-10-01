@@ -1,0 +1,315 @@
+---
+title: "Cloud Monitoring"
+description: "Cloud Monitoring fundamentals for metrics, dashboards and alerting across data services."
+---
+
+# Cloud Monitoring
+
+## Overview
+
+**Cloud Monitoring** provides metrics, dashboards, alerting and other observability capabilities for Google Cloud workloads.
+
+A simple mental model is:
+
+```text
+Metrics
+   ↓
+Dashboards
+   ↓
+Alerting
+   ↓
+Action
+```
+
+Cloud Monitoring complements Cloud Logging:
+
+```text
+Logging  → What happened?
+Monitoring → How is the system behaving?
+```
+
+---
+
+## Learning objectives
+
+Understand:
+
+- Metrics
+- Data-service metrics
+- Dashboards
+- Alerting
+- Monitoring BigQuery, Dataflow and other services
+
+---
+
+## 1. Metrics
+
+A metric is a numerical measurement collected over time.
+
+Examples:
+
+```text
+CPU utilization
+Request count
+Error count
+Latency
+Backlog
+Bytes processed
+Query execution time
+```
+
+Google Cloud services expose many built-in metrics.
+
+You can also create:
+
+- Custom metrics
+- Log-based metrics
+- Prometheus metrics in supported environments
+
+---
+
+## 2. Data-service metrics
+
+### BigQuery
+
+Useful monitoring signals can include:
+
+- Running jobs
+- Query execution characteristics
+- Bytes processed
+- Slot utilization/capacity
+- Query latency
+- Errors
+- Streaming/ingestion-related metrics
+
+Example:
+
+```text
+BigQuery
+   ↓
+Query latency metric
+   ↓
+Dashboard / alert
+```
+
+### Dataflow
+
+Useful signals include:
+
+- Throughput
+- Backlog
+- System lag
+- Worker utilization
+- Autoscaling
+- Errors
+
+### Cloud Storage
+
+Depending on the workload, monitor relevant:
+
+- Request activity
+- Storage usage
+- Network/operation behavior
+- Errors
+
+### Pub/Sub
+
+Useful signals include:
+
+- Message backlog
+- Subscriber throughput
+- Publish/subscribe rates
+- Acknowledgment behavior
+- Delivery latency
+
+---
+
+## 3. Dashboards
+
+Dashboards provide a visual view of operational health.
+
+A data-platform dashboard might contain:
+
+```text
++------------------+------------------+
+| BigQuery latency | Dataflow lag     |
++------------------+------------------+
+| Pub/Sub backlog  | Pipeline errors  |
++------------------+------------------+
+| Query bytes      | Worker usage     |
++------------------+------------------+
+```
+
+Good dashboards should focus on signals that help answer:
+
+> Is the platform healthy?
+
+> Is the pipeline keeping up?
+
+> Is cost/performance changing?
+
+> Is there an incident?
+
+---
+
+## 4. Alerting
+
+An alerting policy defines a condition that should generate an incident/notification.
+
+Example:
+
+```text
+IF
+Dataflow system lag > threshold
+FOR
+10 minutes
+
+THEN
+Create incident
+AND
+Notify team
+```
+
+Alerts should be based on actionable conditions.
+
+Avoid creating alerts for every small fluctuation.
+
+---
+
+## 5. Metric threshold alert
+
+Example:
+
+```text
+Metric:
+pubsub.googleapis.com/subscription/num_unacked_messages
+
+Condition:
+> 1,000,000
+
+Duration:
+10 minutes
+```
+
+This can indicate that subscribers are falling behind.
+
+---
+
+## 6. Log-based metric + alert
+
+Some events are easier to identify from logs.
+
+Example:
+
+```text
+ERROR "pipeline failed"
+       ↓
+Log-based metric
+       ↓
+Monitoring alert
+```
+
+This combines Cloud Logging and Cloud Monitoring.
+
+---
+
+## 7. BigQuery monitoring example
+
+A useful BigQuery operational view could include:
+
+```text
+Query latency
+Bytes processed
+Jobs running
+Slot utilization
+Failed jobs
+Reservation utilization
+```
+
+For production systems, monitor both:
+
+- **Technical health**
+- **Business impact**
+
+Example:
+
+```text
+Technical:
+Dataflow backlog ↑
+
+Business:
+Daily sales data not refreshed
+```
+
+The second signal may be more useful to the business.
+
+---
+
+## 8. Alerting best practices
+
+Good alerts should:
+
+- Be actionable
+- Have meaningful thresholds
+- Include enough context
+- Avoid excessive noise
+- Have a defined owner
+- Link to troubleshooting dashboards/runbooks
+
+Bad alert:
+
+```text
+CPU > 50%
+```
+
+Better:
+
+```text
+Pipeline backlog continuously increasing
+and
+processing throughput is below input rate
+```
+
+---
+
+## 9. Metrics vs logs
+
+| Metrics | Logs |
+|---|---|
+| Numeric time series | Individual events |
+| Good for trends | Good for detailed context |
+| Dashboards | Troubleshooting |
+| Threshold alerts | Event investigation |
+| Low-cardinality signals generally work well | Rich event details |
+
+Use both.
+
+---
+
+## 10. Typical observability architecture
+
+```text
+                    +----------------+
+                    | Cloud Logging  |
+                    +-------+--------+
+                            |
+                    log-based metrics
+                            |
+Sources / Services → Cloud Monitoring
+                            |
+                    +-------+--------+
+                    |                |
+               Dashboards        Alerts
+                    |                |
+               Engineers        Notifications
+```
+
+---
+
+## Official references
+
+- [Cloud Monitoring overview](https://cloud.google.com/monitoring/docs)
+- [Collect metrics](https://cloud.google.com/monitoring/docs/collect-metrics-overview)
+- [Dashboards](https://cloud.google.com/monitoring/dashboards)
+- [Alerting](https://cloud.google.com/monitoring/alerts)
+- [BigQuery monitoring](https://cloud.google.com/bigquery/docs/monitoring)

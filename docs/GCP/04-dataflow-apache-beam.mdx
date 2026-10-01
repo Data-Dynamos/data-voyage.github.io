@@ -1,0 +1,499 @@
+---
+title: "Dataflow and Apache Beam"
+description: "Apache Beam programming model and Google Cloud Dataflow concepts for batch and streaming pipelines."
+---
+
+# Dataflow and Apache Beam
+
+## Overview
+
+**Dataflow** is Google Cloud's fully managed service for executing Apache Beam pipelines.
+
+The relationship is:
+
+```text
+Apache Beam
+   ↓
+Define pipeline
+   ↓
+Dataflow runner
+   ↓
+Google Cloud Dataflow
+   ↓
+Managed execution
+```
+
+Apache Beam provides the **programming model**.
+
+Dataflow provides the **managed execution environment/runner**.
+
+---
+
+## Learning objectives
+
+Understand:
+
+- Apache Beam
+- Pipeline
+- PCollection
+- ParDo
+- GroupByKey
+- Combine
+- Flatten
+- Windowing
+- Fixed/sliding/session windows
+- Watermarks
+- Triggers
+- Batch and streaming
+- Dataflow runner
+- Autoscaling
+- Monitoring
+
+---
+
+## 1. Apache Beam
+
+Apache Beam is a unified programming model for batch and streaming data processing.
+
+Beam lets you define:
+
+```text
+Input
+ ↓
+Transforms
+ ↓
+Output
+```
+
+The same programming model can be used for bounded and unbounded data.
+
+---
+
+## 2. Pipeline
+
+A Beam pipeline represents the complete processing graph.
+
+Example:
+
+```python
+with beam.Pipeline() as p:
+
+    lines = p | "Read" >> beam.io.ReadFromText("gs://bucket/input/*.csv")
+
+    records = (
+        lines
+        | "Parse" >> beam.Map(parse_record)
+        | "Validate" >> beam.Filter(is_valid)
+        | "Transform" >> beam.Map(transform)
+    )
+
+    records | "Write" >> ...
+```
+
+Conceptually:
+
+```text
+Read
+ ↓
+Parse
+ ↓
+Validate
+ ↓
+Transform
+ ↓
+Write
+```
+
+---
+
+## 3. PCollection
+
+A **PCollection** represents a distributed collection of data.
+
+It may be:
+
+- Bounded → batch
+- Unbounded → streaming
+
+Example:
+
+```text
+PCollection<Order>
+```
+
+Unlike a normal in-memory Python list, a PCollection represents data processed by a distributed pipeline.
+
+---
+
+## 4. ParDo
+
+`ParDo` applies custom processing to each element.
+
+Example:
+
+```python
+class ParseOrder(beam.DoFn):
+
+    def process(self, element):
+        yield parse_order(element)
+```
+
+Then:
+
+```python
+orders | beam.ParDo(ParseOrder())
+```
+
+Use `ParDo` for:
+
+- Parsing
+- Validation
+- Enrichment
+- Custom business logic
+- Calling supported external systems carefully
+
+---
+
+## 5. GroupByKey
+
+`GroupByKey` groups values by key.
+
+Input:
+
+```text
+(customer1, 100)
+(customer2, 200)
+(customer1, 50)
+```
+
+Output:
+
+```text
+customer1 → [100, 50]
+customer2 → [200]
+```
+
+It is useful for grouping event streams or records by a business key.
+
+> **Important:** Grouping can cause a shuffle. Poorly distributed keys can create performance problems.
+
+---
+
+## 6. Combine
+
+`Combine` performs aggregation.
+
+Example:
+
+```text
+customer1 → [100, 50]
+                ↓
+              SUM
+                ↓
+               150
+```
+
+Common aggregations:
+
+- Sum
+- Count
+- Mean
+- Min/max
+- Custom combiners
+
+For large distributed workloads, Combine is preferred over manually collecting all values.
+
+---
+
+## 7. Flatten
+
+`Flatten` merges multiple PCollections.
+
+```text
+PCollection A ──┐
+                ├── Flatten → PCollection
+PCollection B ──┘
+```
+
+Useful when multiple input streams/files need to be combined.
+
+---
+
+## 8. Windowing
+
+Windowing divides an unbounded stream into finite logical groups.
+
+Why?
+
+A streaming pipeline is potentially infinite:
+
+```text
+event → event → event → event → ...
+```
+
+We need boundaries to calculate:
+
+```text
+count per 5 minutes
+revenue per hour
+average latency per 10 minutes
+```
+
+Windowing provides these boundaries.
+
+---
+
+## 9. Fixed windows
+
+Fixed/tumbling windows divide data into equal non-overlapping intervals.
+
+Example:
+
+```text
+00:00 ─── 00:05
+00:05 ─── 00:10
+00:10 ─── 00:15
+```
+
+Use when each event should belong to one fixed time bucket.
+
+---
+
+## 10. Sliding windows
+
+Sliding windows overlap.
+
+Example:
+
+```text
+Window 1: 00:00 ─── 00:10
+Window 2: 00:05 ─── 00:15
+Window 3: 00:10 ─── 00:20
+```
+
+Useful for rolling metrics such as:
+
+> "Calculate the number of events in the previous 10 minutes every 5 minutes."
+
+---
+
+## 11. Session windows
+
+Session windows group events based on periods of activity separated by a gap.
+
+Example:
+
+```text
+User activity:
+
+A A A       A A       A
+|-----------|---------|
+ session 1    session 2
+```
+
+A new session begins after the configured inactivity gap.
+
+Useful for:
+
+- User sessions
+- Clickstream analysis
+- Application activity
+
+---
+
+## 12. Watermarks
+
+A **watermark** represents the system's estimate of how far event time has progressed and when the system expects most data for a window to have arrived.
+
+Example:
+
+```text
+Event time:
+10:01  10:02  10:03  10:01.5
+  ↓      ↓      ↓       ↓
+out-of-order event
+```
+
+Streaming systems cannot assume events arrive in event-time order.
+
+Watermarks help Dataflow decide when a window is sufficiently complete.
+
+---
+
+## 13. Triggers
+
+A trigger determines **when results should be emitted**.
+
+For example:
+
+```text
+Window: 10:00–10:05
+
+10:01 → partial result
+10:03 → partial result
+10:05 → on-time result
+10:07 → late-data result
+```
+
+Triggers can be based on:
+
+- Event time
+- Processing time
+- Number of elements
+- Combinations of conditions
+
+---
+
+## 14. Batch vs streaming
+
+### Batch
+
+Input is bounded.
+
+```text
+Files
+ ↓
+Dataflow
+ ↓
+Result
+```
+
+Example:
+
+```text
+GCS files
+ ↓
+Dataflow
+ ↓
+BigQuery
+```
+
+### Streaming
+
+Input is continuously arriving.
+
+```text
+Pub/Sub
+ ↓
+Dataflow
+ ↓
+BigQuery
+```
+
+A key Beam benefit is a common programming model for both.
+
+---
+
+## 15. Dataflow runner
+
+When using Beam, the pipeline needs a runner.
+
+Example:
+
+```text
+Beam pipeline
+    ↓
+DataflowRunner
+    ↓
+Google Cloud Dataflow
+```
+
+The runner translates the pipeline into execution on Dataflow.
+
+---
+
+## 16. Autoscaling
+
+Dataflow can automatically adjust worker resources based on workload.
+
+Conceptually:
+
+```text
+Low input
+   ↓
+Fewer workers
+
+High input
+   ↓
+More workers
+```
+
+Autoscaling is particularly valuable when workload volume changes over time.
+
+However, autoscaling does not eliminate the need for good pipeline design.
+
+Common bottlenecks include:
+
+- Hot keys
+- External API calls
+- Large grouping operations
+- Poorly designed transforms
+- Slow sinks
+- Unbounded state
+
+---
+
+## 17. Monitoring
+
+Dataflow provides monitoring information such as:
+
+- Job state
+- Throughput
+- Worker utilization
+- System lag
+- Backlog
+- Errors
+- Processing latency
+- Autoscaling activity
+
+For streaming pipelines, pay particular attention to:
+
+```text
+Input rate
+Processing rate
+Backlog
+System lag
+Watermark
+```
+
+A growing backlog can indicate that processing cannot keep up with incoming data.
+
+---
+
+## 18. Typical architecture
+
+### Batch
+
+```text
+GCS
+ ↓
+Dataflow
+ ↓
+Transform
+ ↓
+BigQuery
+```
+
+### Streaming
+
+```text
+Applications
+ ↓
+Pub/Sub
+ ↓
+Dataflow
+ ↓
+BigQuery
+ ↓
+Looker / Analytics
+```
+
+---
+
+
+## Official references
+
+- [Dataflow documentation](https://cloud.google.com/dataflow/docs)
+- [Apache Beam programming model](https://cloud.google.com/dataflow/docs/concepts/beam-programming-model)
+- [Streaming pipelines](https://cloud.google.com/dataflow/docs/concepts/streaming-pipelines)
+- [Dataflow monitoring](https://cloud.google.com/dataflow/docs/guides/using-cloud-monitoring)

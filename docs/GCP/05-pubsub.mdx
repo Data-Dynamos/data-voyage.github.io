@@ -1,0 +1,307 @@
+---
+title: "Pub/Sub
+"
+description: "Google Cloud Pub/Sub fundamentals, topics, subscriptions, message delivery, Scheduler integration and Pub/Sub Lite."
+---
+
+# Pub/Sub
+
+## Overview
+
+**Google Cloud Pub/Sub** is a managed asynchronous messaging service.
+
+It decouples publishers from subscribers:
+
+```text
+Publisher
+   ↓
+ Topic
+   ↓
+Subscription
+   ↓
+Subscriber
+```
+
+The publisher does not need to know which application consumes the message.
+
+---
+
+## Learning objectives
+
+Understand:
+
+- Topics
+- Subscriptions
+- Publishing
+- Pull delivery
+- Acknowledgments
+- Pub/Sub + Cloud Scheduler
+- Pub/Sub Lite
+- Pub/Sub vs Pub/Sub Lite
+
+---
+
+## 1. Topic
+
+A **topic** is the named resource to which publishers send messages.
+
+```text
+Application
+    ↓
+ orders-topic
+```
+
+Create:
+
+```bash
+gcloud pubsub topics create orders-topic
+```
+
+---
+
+## 2. Subscription
+
+A **subscription** represents a stream of messages from a topic for a subscriber.
+
+```text
+                 orders-topic
+                 /           \
+                /             \
+        subscription-A     subscription-B
+              ↓                 ↓
+          Dataflow           Application
+```
+
+This enables fan-out.
+
+Create:
+
+```bash
+gcloud pubsub subscriptions create orders-sub \
+  --topic=orders-topic
+```
+
+---
+
+## 3. Topic vs subscription
+
+This is one of the most important concepts.
+
+### Topic
+
+> Where publishers send messages.
+
+### Subscription
+
+> How a particular consumer receives messages from a topic.
+
+A topic can have multiple subscriptions.
+
+---
+
+## 4. Publish messages
+
+Example:
+
+```bash
+gcloud pubsub topics publish orders-topic \
+  --message='{"order_id":123,"amount":500}'
+```
+
+Conceptually:
+
+```text
+Publisher
+   ↓
+Pub/Sub topic
+   ↓
+Message retained for subscriptions
+```
+
+---
+
+## 5. Pull messages
+
+A pull subscriber asks Pub/Sub for available messages.
+
+Example:
+
+```bash
+gcloud pubsub subscriptions pull orders-sub \
+  --limit=10
+```
+
+Applications normally use client libraries rather than repeatedly using the CLI.
+
+---
+
+## 6. Acknowledge messages
+
+After successfully processing a message, the subscriber sends an acknowledgment.
+
+```text
+Receive
+  ↓
+Process
+  ↓
+Success
+  ↓
+ACK
+```
+
+If the message is not acknowledged within the applicable delivery/acknowledgment window, Pub/Sub may redeliver it.
+
+Therefore, consumers should generally be designed to be **idempotent**.
+
+Example:
+
+```text
+Message 123
+   ↓
+Process
+   ↓
+Failure
+   ↓
+Redelivery
+   ↓
+Process again
+```
+
+---
+
+## 7. Push vs pull
+
+### Pull
+
+```text
+Subscriber → Pub/Sub
+             "Give me messages"
+```
+
+### Push
+
+```text
+Pub/Sub → Subscriber endpoint
+```
+
+The choice depends on the application architecture.
+
+---
+
+## 8. Pub/Sub + Cloud Scheduler
+
+Cloud Scheduler can publish messages to Pub/Sub on a schedule.
+
+Example:
+
+```text
+Cloud Scheduler
+      |
+      | every day 02:00
+      ↓
+Pub/Sub topic
+      ↓
+Dataflow / Cloud Run / application
+```
+
+This is useful for scheduled event-driven workflows.
+
+Example use cases:
+
+- Start a daily processing workflow
+- Trigger a periodic reconciliation
+- Send a daily refresh event
+- Initiate a batch pipeline
+
+---
+
+## 9. Pub/Sub + Dataflow
+
+One of the most common streaming architectures:
+
+```text
+Application events
+       ↓
+     Pub/Sub
+       ↓
+    Dataflow
+       ↓
+    BigQuery
+```
+
+Pub/Sub handles messaging.
+
+Dataflow handles processing.
+
+BigQuery handles analytical storage.
+
+This separation of responsibilities is an important architecture principle.
+
+---
+
+## 10. Pub/Sub Lite
+
+**Important current status:** Pub/Sub Lite is deprecated and is scheduled to be turned down on **January 31, 2027**. It is no longer available to new customers.
+
+For new designs, do not select Pub/Sub Lite.
+
+Existing customers should plan migration to:
+
+- Pub/Sub
+- Google Cloud Managed Service for Apache Kafka
+
+---
+
+## 11. Pub/Sub vs Pub/Sub Lite
+
+Historically:
+
+| Pub/Sub | Pub/Sub Lite |
+|---|---|
+| Fully managed messaging | Partition-based messaging |
+| Broad integration/features | More explicit capacity/partition considerations |
+| General-purpose choice | Specialized workloads |
+| Recommended for most new use cases | Deprecated |
+
+For current onboarding:
+
+> **Teach Pub/Sub as the default managed messaging service. Treat Pub/Sub Lite primarily as a legacy/deprecation topic.**
+
+---
+
+## 12. Delivery model
+
+A simplified delivery flow:
+
+```text
+Publisher
+   ↓
+Topic
+   ↓
+Subscription
+   ↓
+Subscriber
+   ↓
+ACK
+```
+
+Important concepts to understand:
+
+- At-least-once delivery
+- Acknowledgment
+- Redelivery
+- Ordering when explicitly configured and supported
+- Dead-letter handling
+- Retry behavior
+- Message retention
+
+---
+
+
+## Official references
+
+- [Pub/Sub overview](https://cloud.google.com/pubsub/docs/overview)
+- [Topics and subscriptions](https://cloud.google.com/pubsub/docs/create-topic)
+- [Publish and receive messages](https://cloud.google.com/pubsub/docs/publisher)
+- [Cloud Scheduler + Pub/Sub](https://cloud.google.com/scheduler/docs/tut-pub-sub)
+- [Pub/Sub Lite status](https://cloud.google.com/pubsub/lite/docs)
