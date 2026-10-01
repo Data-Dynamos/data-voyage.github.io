@@ -1,0 +1,464 @@
+---
+title: "BigQuery"
+description: "BigQuery architecture, storage, querying, table design, partitioning, clustering, performance and pricing."
+---
+
+# BigQuery
+
+
+## Overview
+
+**BigQuery** is Google Cloud's fully managed, serverless analytical data warehouse.
+
+The most important architectural concept is:
+
+> **BigQuery separates storage from compute.**
+
+This allows data storage and query-processing capacity to scale independently.
+
+A simplified view:
+
+```text
+                 BigQuery
+                    |
+        +-----------+-----------+
+        |                       |
+     Storage                 Compute
+        |                       |
+ Columnar data          Query execution
+        |                       |
+        +-----------+-----------+
+                    |
+                  SQL
+```
+
+BigQuery is designed primarily for analytical workloads rather than traditional OLTP transactions.
+
+---
+
+## Learning objectives
+
+Understand:
+
+- BigQuery architecture
+- Projects and datasets
+- Table types
+- Partitioning
+- Clustering
+- Storage and query processing
+- Query caching
+- Pricing models
+- Performance optimization
+
+---
+
+## 1. Architecture
+
+A simplified query flow is:
+
+```text
+SQL query
+   ↓
+Query engine
+   ↓
+Query stages
+   ↓
+Parallel workers / slots
+   ↓
+Read required columnar data
+   ↓
+Shuffle / aggregate / join
+   ↓
+Result
+```
+
+BigQuery distributes query execution across many workers.
+
+### Storage-compute separation
+
+Because storage and compute are separated:
+
+- Storage can grow without provisioning servers.
+- Compute resources can scale independently.
+- Engineers do not manage database VMs.
+- Capacity can be managed through BigQuery editions/reservations and autoscaling where applicable.
+
+---
+
+## 2. Projects and datasets
+
+A common hierarchy is:
+
+```text
+Organization
+   ↓
+Folder
+   ↓
+Project
+   ↓
+Dataset
+   ↓
+Table / View / Model
+```
+
+A **dataset** is a logical container for BigQuery resources.
+
+Example:
+
+```text
+analytics-project
+    └── sales_dataset
+          ├── customers
+          ├── orders
+          ├── order_items
+          └── sales_summary
+```
+
+Fully qualified table:
+
+```text
+project.dataset.table
+```
+
+Example:
+
+```sql
+SELECT *
+FROM `analytics-project.sales_dataset.orders`;
+```
+
+---
+
+## 3. BigQuery table types
+
+Important table/resource types include:
+
+### Standard/native tables
+
+Data is stored in BigQuery storage.
+
+### External tables
+
+Metadata is stored in BigQuery while the underlying data remains in an external source such as GCS.
+
+### Views
+
+A logical query definition.
+
+```sql
+CREATE VIEW dataset.active_customers AS
+SELECT ...
+```
+
+### Materialized views
+
+Precomputed results that can improve performance for supported workloads.
+
+### Table snapshots
+
+Point-in-time, read-only representations of tables.
+
+### Temp tables
+
+Tables crated as part of the stored procedure with lifetime of session or script.
+
+---
+
+## 4. Partitioning
+
+Partitioning divides a large table into logical partitions.
+
+Example:
+
+```text
+sales
+ |
+ +-- 2026-01-01
+ +-- 2026-01-02
+ +-- 2026-01-03
+ ...
+```
+
+Common partitioning approaches include:
+
+- Time-unit column
+- Ingestion-time
+- Integer range
+
+Example:
+
+```sql
+CREATE TABLE sales.orders
+PARTITION BY DATE(order_timestamp)
+AS
+SELECT ...
+```
+
+### Partition pruning
+
+If a query filters on the partitioning column:
+
+```sql
+SELECT *
+FROM sales.orders
+WHERE DATE(order_timestamp) = '2026-09-01';
+```
+
+BigQuery can scan only relevant partitions rather than the complete table.
+
+This can improve performance and reduce bytes processed for on-demand query pricing.
+
+### Partitioning rule of thumb
+
+Partition when the table is large enough and queries commonly filter on a suitable partitioning key.
+
+Do not create partitions simply because partitioning is available.
+
+---
+
+## 5. Clustering
+
+Clustering organizes data within a table based on selected columns.
+
+Example:
+
+```sql
+CREATE TABLE sales.orders
+PARTITION BY DATE(order_timestamp)
+CLUSTER BY customer_id, product_id
+AS
+SELECT ...
+```
+
+Think of the relationship as:
+
+```text
+Partition
+   ↓
+Clustered blocks
+   ↓
+Relevant blocks scanned
+```
+
+Clustering is particularly useful when queries frequently filter or aggregate on selected columns.
+
+### Partitioning vs clustering
+
+| Partitioning | Clustering |
+|---|---|
+| Divides table into partitions | Organizes data within partitions/table |
+| Strong coarse-grained pruning | Finer block pruning |
+| Usually based on time/range | Often based on frequently filtered columns |
+| Useful for lifecycle management | Useful for query performance |
+
+They can be used together.
+
+---
+
+## 6. Pricing
+
+BigQuery costs depend on the services/features used and pricing model.
+
+Major considerations include:
+
+- Storage
+- Query analysis/compute
+- Streaming or ingestion features
+- Reservations/capacity
+- BI Engine
+- Other BigQuery features
+
+For on-demand analysis pricing, a major cost driver is the amount of data processed by queries.
+
+> **Important:** `LIMIT` does not automatically reduce the bytes processed by a query.
+
+Example:
+
+```sql
+SELECT *
+FROM large_table
+LIMIT 10;
+```
+
+This may still process a large amount of data.
+
+Instead, reduce scanned data through:
+
+- Selecting only required columns
+- Partition filters
+- Clustering
+- Better query design
+
+Use maximum-bytes-billed controls where appropriate.
+
+---
+
+## 7. Performance
+
+The central performance principle is:
+
+> **Make BigQuery do less work.**
+
+Consider:
+
+### Select only required columns
+
+Avoid:
+
+```sql
+SELECT *
+```
+
+Prefer:
+
+```sql
+SELECT customer_id, order_date, amount
+```
+
+### Filter partitions
+
+```sql
+WHERE order_date >= '2026-09-01'
+```
+
+### Use appropriate clustering
+
+Cluster on columns frequently used in filtering/joining patterns when justified.
+
+### Reduce unnecessary data movement
+
+Large joins and aggregations can create significant shuffle.
+
+### Use materialized views where appropriate
+
+Materialized views can precompute common query results.
+
+### Use BI Engine for supported BI workloads
+
+BI Engine provides in-memory acceleration for suitable queries.
+
+---
+
+## 8. Storage
+
+BigQuery storage is managed and optimized for analytical workloads.
+
+Important concepts:
+
+- Columnar storage
+- Separation of storage and compute
+- Automatic scaling
+- High-throughput reads
+- Long-term storage pricing considerations
+- Table/partition expiration
+
+Columnar storage means a query that selects only a few columns can avoid reading unrelated columns.
+
+---
+
+## 9. Querying
+
+BigQuery uses **GoogleSQL**.
+
+Typical query:
+
+```sql
+SELECT
+  product_category,
+  SUM(revenue) AS total_revenue
+FROM `project.sales.orders`
+WHERE order_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+GROUP BY product_category
+ORDER BY total_revenue DESC;
+```
+
+BigQuery can query:
+
+- Native tables
+- Views
+- External tables
+- Federated sources in supported scenarios
+- Information Schema metadata
+
+---
+
+## 10. Query cache
+
+BigQuery can reuse results from an identical query when cache conditions are satisfied.
+
+Conceptually:
+
+```text
+Query 1
+   ↓
+Compute
+   ↓
+Cached result
+
+Same query
+   ↓
+Cache hit
+   ↓
+Return cached result
+```
+
+Cached query results are typically much faster and don't incur query analysis charges when reused from the cache.
+
+However, query caching is **best effort** and has limitations.
+
+Do not design a production pipeline that depends on query cache for correctness.
+
+---
+
+
+## 12. Partitioning + clustering example
+
+For a large sales table:
+
+```text
+orders
+ |
+ +-- partition by order_date
+ |
+ +-- cluster by customer_id
+ +-- cluster by product_id
+```
+
+Query:
+
+```sql
+SELECT
+  customer_id,
+  SUM(amount)
+FROM `project.sales.orders`
+WHERE order_date BETWEEN '2026-09-01' AND '2026-09-30'
+  AND customer_id = 12345
+GROUP BY customer_id;
+```
+
+Potential optimization:
+
+```text
+Partition pruning
+       ↓
+September partitions only
+       ↓
+Cluster pruning
+       ↓
+Relevant blocks
+       ↓
+Aggregation
+```
+
+---
+
+## Official references
+
+- [BigQuery documentation](https://cloud.google.com/bigquery/docs)
+- [BigQuery storage architecture](https://cloud.google.com/bigquery/docs/storage_overview)
+- [Tables](https://cloud.google.com/bigquery/docs/tables-intro)
+- [Partitioned tables](https://cloud.google.com/bigquery/docs/partitioned-tables)
+- [Clustered tables](https://cloud.google.com/bigquery/docs/clustered-tables)
+- [Query performance](https://cloud.google.com/bigquery/docs/best-practices-performance-overview)
+- [Query cache](https://cloud.google.com/bigquery/docs/cached-results)
+- [BigQuery pricing](https://cloud.google.com/bigquery/pricing)

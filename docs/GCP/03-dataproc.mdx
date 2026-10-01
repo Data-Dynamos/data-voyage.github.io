@@ -1,0 +1,298 @@
+---
+title: "Dataproc"
+description: "Dataproc fundamentals for managed Spark/Hadoop workloads and integration with GCS and BigQuery."
+---
+
+# Dataproc
+
+
+## Overview
+
+**Dataproc** is Google Cloud's managed service for running open-source data processing frameworks such as Apache Spark and Hadoop.
+
+For modern data engineering, the most common Dataproc workload is **Spark/PySpark**.
+
+A simplified architecture:
+
+```text
+             Dataproc
+                 |
+       +---------+---------+
+       |                   |
+    Primary             Workers
+    node(s)              nodes
+       |                   |
+       +---------+---------+
+                 |
+              Spark
+                 |
+       +---------+---------+
+       |                   |
+      GCS              BigQuery
+```
+
+Dataproc manages the infrastructure while the engineering team focuses on the Spark application.
+
+---
+
+## Learning objectives
+
+Understand:
+
+- Dataproc clusters
+- Cluster lifecycle
+- Cluster configuration
+- Spark DataFrames
+- GCS integration
+- BigQuery integration
+- When Dataproc is appropriate compared with Dataflow
+
+---
+
+## 1. Dataproc clusters
+
+A traditional Dataproc cluster contains:
+
+- Primary/master node(s)
+- Worker nodes
+- Optional secondary workers
+
+Example:
+
+```text
+Primary
+   |
+   +---- Worker 1
+   +---- Worker 2
+   +---- Worker 3
+```
+
+Spark uses the cluster resources to execute distributed transformations.
+
+---
+
+## 2. Cluster management
+
+Dataproc clusters are managed resources.
+
+Typical lifecycle:
+
+```text
+Create
+  ↓
+Configure
+  ↓
+Run jobs
+  ↓
+Monitor
+  ↓
+Scale / modify if required
+  ↓
+Delete
+```
+
+Example:
+
+```bash
+gcloud dataproc clusters create sales-cluster \
+  --region=asia-south1 \
+  --single-node
+```
+
+Submit a Spark job:
+
+```bash
+gcloud dataproc jobs submit pyspark \
+  gs://my-code-bucket/jobs/sales.py \
+  --region=asia-south1
+```
+
+Delete:
+
+```bash
+gcloud dataproc clusters delete sales-cluster \
+  --region=asia-south1
+```
+
+> **Production note:** Use approved cluster templates/configurations and infrastructure-as-code where possible.
+
+---
+
+## 3. Cluster configuration
+
+Important decisions include:
+
+- Region
+- Image/runtime version
+- Machine types
+- Number of workers
+- Autoscaling
+- Networking
+- Service account
+- Encryption
+- Initialization actions
+- Component gateways
+- Optional Spark/Hadoop components
+
+The cluster configuration should be driven by workload requirements rather than copying a default configuration.
+
+---
+
+## 4. DataFrames
+
+Spark DataFrames are distributed collections of structured data.
+
+Example:
+
+```python
+df = spark.read.parquet(
+    "gs://my-data-lake/sales/"
+)
+
+result = (
+    df.filter(df.amount > 1000)
+      .groupBy("product_category")
+      .sum("amount")
+)
+```
+
+DataFrame operations are usually expressed declaratively and Spark builds an execution plan.
+
+Common operations:
+
+```python
+select()
+filter()
+withColumn()
+join()
+groupBy()
+agg()
+orderBy()
+dropDuplicates()
+```
+
+---
+
+## 5. Dataproc + GCS
+
+GCS is commonly the persistent storage layer for Dataproc.
+
+```text
+GCS
+ |
+ +-- raw/
+ +-- curated/
+ +-- output/
+ +-- code/
+ |
+ ↓
+Dataproc / Spark
+```
+
+Spark can read/write GCS using paths such as:
+
+```text
+gs://bucket/path/
+```
+
+This allows compute clusters to be relatively ephemeral while data remains in durable storage.
+
+### Common architecture
+
+```text
+GCS raw
+   ↓
+Dataproc Spark
+   ↓
+GCS curated
+```
+
+---
+
+## 6. Dataproc + BigQuery
+
+Dataproc includes integration capabilities for reading and writing BigQuery data.
+
+Typical architecture:
+
+```text
+BigQuery
+   ↓
+Dataproc / Spark
+   ↓
+Transformation
+   ↓
+BigQuery
+```
+
+Example conceptually:
+
+```python
+df = (
+    spark.read
+    .format("bigquery")
+    .option("table", "project.dataset.orders")
+    .load()
+)
+```
+
+Write:
+
+```python
+(
+    df.write
+      .format("bigquery")
+      .option("table", "project.dataset.orders_curated")
+      .mode("overwrite")
+      .save()
+)
+```
+
+The exact connector options depend on the runtime and workload.
+
+---
+
+## 7. Dataproc vs Dataflow
+
+| Dataproc | Dataflow |
+|---|---|
+| Managed Spark/Hadoop | Managed Apache Beam |
+| Excellent for Spark workloads | Excellent for unified batch/streaming pipelines |
+| Useful for existing Spark applications | Strong streaming/event-time model |
+| More direct Spark ecosystem access | Serverless pipeline execution |
+| Cluster/runtime configuration matters | Worker management largely abstracted |
+
+A useful onboarding question is:
+
+> **Do we need Spark specifically, or do we need a managed data-processing pipeline?**
+
+If an existing application is PySpark/Spark SQL, Dataproc is often a natural fit.
+
+---
+
+## 8. Common data engineering pattern
+
+```text
+Source
+  ↓
+GCS landing
+  ↓
+Dataproc Spark
+  ├── Clean
+  ├── Join
+  ├── Aggregate
+  └── Transform
+  ↓
+GCS curated / BigQuery
+  ↓
+Analytics / ML
+```
+
+---
+
+## Official references
+
+- [Dataproc documentation](https://cloud.google.com/dataproc/docs)
+- [Dataproc clusters](https://cloud.google.com/dataproc/docs/concepts/configuring-clusters/cluster-overview)
+- [Dataproc jobs](https://cloud.google.com/dataproc/docs/guides/submit-job)
+- [BigQuery connector](https://cloud.google.com/dataproc/docs/examples/bigquery-example)

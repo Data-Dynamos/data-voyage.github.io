@@ -1,0 +1,442 @@
+---
+title: "Cloud Storage (GCS)"
+description: "Google Cloud Storage fundamentals and its role in data engineering solutions."
+---
+
+# Cloud Storage (GCS)
+
+## Overview
+
+**Google Cloud Storage (GCS)** is Google's managed object storage service. It is commonly used as the **data lake / landing / staging layer** in a Google Cloud data platform.
+
+
+Unlike a relational database, GCS does not organize data into rows and columns. Data is stored as **objects inside buckets**.
+
+In data engineering, GCS is frequently used for:
+
+- Raw/landing data
+- Batch files such as CSV, JSON, Avro and Parquet
+- Data exchange between systems
+- Dataflow input/output
+- Spark/Dataproc input/output
+- BigQuery load and external-table sources
+- Backup and archival data
+- Event-driven processing
+
+## Learning objectives
+
+By the end of this module, a new engineer should understand:
+
+- How buckets and objects work
+- How to choose storage classes
+- How lifecycle rules and retention differ
+- How IAM and uniform bucket-level access work
+- How object versioning works
+- How encryption works
+- How to use `gcloud storage`
+- How GCS can trigger downstream processing
+- How GCS integrates with BigQuery, Dataflow and Dataproc
+
+---
+
+## 1. Bucket creation
+
+A **bucket** is the top-level container for objects.
+
+Important bucket properties include:
+
+- Globally unique bucket name
+- Location
+- Default storage class
+- Access-control model
+- Retention configuration
+- Versioning
+- Encryption configuration
+- Lifecycle rules
+
+Example:
+
+```bash
+gcloud storage buckets create gs://my-data-lake-bucket \
+  --location=asia-south1 \
+  --uniform-bucket-level-access
+```
+
+List buckets:
+
+```bash
+gcloud storage buckets list
+```
+
+Create an object:
+
+```bash
+gcloud storage cp local-file.csv gs://my-data-lake-bucket/raw/
+```
+
+List objects:
+
+```bash
+gcloud storage ls gs://my-data-lake-bucket/raw/
+```
+
+> **Onboarding note:** Treat bucket creation as an infrastructure/configuration activity. In production, prefer Terraform or another approved IaC process rather than manually creating infrastructure from the console.
+
+---
+
+## 2. Storage classes
+
+A storage class influences the availability and pricing characteristics of objects.
+
+Common classes include:
+
+| Class | Typical use |
+|---|---|
+| Standard | Frequently accessed data |
+| Nearline | Data accessed approximately monthly |
+| Coldline | Infrequently accessed data |
+| Archive | Long-term archival |
+| Rapid | Specialized high-performance workloads where available |
+
+The correct choice depends on **access frequency, retention duration, retrieval requirements and cost**.
+
+Google Cloud also provides **Autoclass**, which can automatically transition objects between storage classes based on access patterns.
+
+> **Important:** Changing a bucket's default storage class does not automatically change the storage class of objects that already exist in the bucket.
+
+---
+
+## 3. Object lifecycle
+
+Cloud Storage Object Lifecycle Management lets you automatically perform actions when objects meet conditions.
+
+Typical actions:
+
+- Delete objects
+- Change storage class
+
+Typical conditions:
+
+- Object age
+- Created time
+- Number of newer versions
+- Storage class
+- Custom time
+- Object state
+
+Example conceptual policy:
+
+```text
+Raw data
+   ↓ 30 days
+Nearline
+   ↓ 90 days
+Coldline
+   ↓ 365 days
+Archive / Delete
+```
+
+### Lifecycle vs retention
+
+Do not confuse these:
+
+**Lifecycle rule**
+
+> "When this condition is met, perform an action."
+
+**Retention policy**
+
+> "Do not allow deletion/replacement before this minimum retention period."
+
+These solve different problems.
+
+---
+
+## 4. IAM
+
+Cloud Storage supports Google Cloud IAM for access control.
+
+Common roles include:
+
+- Storage Object Viewer
+- Storage Object Creator
+- Storage Object User
+- Storage Admin
+
+Prefer granting the **minimum permissions required**.
+
+Example:
+
+```text
+Dataflow service account
+       ↓
+Object Viewer
+       ↓
+gs://raw-data
+```
+
+The service account does not necessarily need full Storage Admin permissions.
+
+---
+
+## 5. Uniform bucket-level access
+
+Cloud Storage historically supported both IAM and object/bucket ACLs.
+
+**Uniform bucket-level access (UBLA)** simplifies this model by making IAM the access-control mechanism for the bucket and its objects.
+
+When UBLA is enabled:
+
+```text
+IAM
+ ↓
+Bucket
+ ↓
+Objects
+```
+
+Object ACLs no longer grant access.
+
+This is generally preferred for modern enterprise data platforms because it provides a more consistent IAM model and reduces accidental exposure through object ACLs.
+
+> **Important:** Enabling UBLA can revoke access that was previously granted only through ACLs. Test existing workloads before changing the access model.
+
+---
+
+## 6. Object versioning
+
+Object versioning allows multiple generations of an object to be retained.
+
+Example:
+
+```text
+customer.csv
+  ├── generation 1
+  ├── generation 2
+  └── generation 3  ← current
+```
+
+This can protect against accidental overwrites or deletions.
+
+Versioning should be combined with lifecycle management when appropriate because retaining many versions can increase storage consumption.
+
+---
+
+## 7. Retention policies
+
+A retention policy prevents objects from being deleted or replaced until the retention period has elapsed.
+
+Example:
+
+```text
+Retention period = 7 years
+
+Object created
+      ↓
+7-year retention window
+      ↓
+Object can be deleted/replaced
+```
+
+Retention is particularly relevant for compliance and records-management requirements.
+
+### Retention policy vs object hold
+
+- **Retention policy:** applies a minimum retention duration.
+- **Temporary hold:** prevents deletion until the hold is released.
+- **Event-based hold:** keeps an object until a business event occurs.
+
+---
+
+## 8. Encryption
+
+Cloud Storage encrypts data at rest by default.
+
+Encryption options include:
+
+- Google-managed encryption
+- Customer-managed encryption keys (CMEK)
+- Customer-supplied encryption keys (CSEK)
+- Client-side encryption
+
+For many enterprise workloads:
+
+```text
+Application
+    ↓
+Cloud Storage
+    ↓
+Google-managed encryption
+```
+
+For workloads requiring customer control over key lifecycle:
+
+```text
+Cloud Storage
+      ↓
+Cloud KMS
+      ↓
+CMEK
+```
+
+> **Important:** If a CMEK key version is destroyed while it is still required to decrypt objects, the affected object data can become permanently inaccessible.
+
+---
+
+## 9. `gcloud storage` and `gsutil`
+
+For new work, use:
+
+```bash
+gcloud storage
+```
+
+rather than building new automation around legacy `gsutil`.
+
+Examples:
+
+```bash
+gcloud storage ls gs://bucket-name
+
+gcloud storage cp file.csv gs://bucket-name/
+
+gcloud storage cp gs://bucket-name/file.csv .
+
+gcloud storage rsync ./data gs://bucket-name/data
+```
+
+`gsutil` is still relevant when maintaining legacy scripts, but Google recommends migrating to `gcloud storage`.
+
+---
+
+## 10. Event-driven triggers
+
+GCS can participate in event-driven architectures.
+
+A common pattern is:
+
+```text
+File uploaded to GCS
+        ↓
+Cloud Storage event
+        ↓
+Pub/Sub / Eventarc
+        ↓
+Cloud Run / Function / Dataflow
+        ↓
+Process file
+```
+
+Cloud Storage can send object-change notifications to Pub/Sub.
+
+For direct event-driven application integration, Eventarc can also receive supported Cloud Storage events and route them to supported destinations.
+
+### Important design consideration
+
+Cloud Storage notifications are generally **at-least-once**, so downstream consumers should be designed to tolerate duplicate events.
+
+---
+
+## 11. GCS → BigQuery
+
+GCS commonly acts as the landing layer before data is loaded into BigQuery.
+
+### Batch load
+
+```text
+GCS
+ ↓
+BigQuery load job
+ ↓
+BigQuery table
+```
+
+Example:
+
+```bash
+bq load \
+  --source_format=PARQUET \
+  project_id:dataset.sales \
+  gs://bucket/sales/*.parquet
+```
+
+### External table
+
+BigQuery can also query data stored in GCS through external tables.
+
+```text
+GCS files
+   ↓
+BigQuery external table
+   ↓
+SQL
+```
+
+Use an external table when you need query access without first loading the data into native BigQuery storage.
+
+For repeated analytical workloads, native BigQuery tables are often preferable because they provide BigQuery storage and query-optimization capabilities.
+
+---
+
+## 12. GCS → Dataflow
+
+Dataflow can read files from GCS using Apache Beam I/O connectors.
+
+Typical pattern:
+
+```text
+GCS
+ ↓
+Dataflow
+ ├── Read
+ ├── Parse
+ ├── Validate
+ ├── Transform
+ └── Enrich
+ ↓
+BigQuery / GCS / other sink
+```
+
+This is useful when file ingestion requires:
+
+- Complex transformations
+- Data validation
+- Enrichment
+- Deduplication
+- Batch processing
+- Conversion between formats
+
+---
+
+## 13. GCS → Dataproc
+
+Spark workloads running on Dataproc can read and write GCS using the Google Cloud Storage connector.
+
+Typical architecture:
+
+```text
+GCS
+ ↓
+Dataproc / Spark
+ ├── PySpark
+ ├── Spark SQL
+ └── DataFrame transformations
+ ↓
+GCS / BigQuery
+```
+
+This is particularly useful for large-scale batch processing or workloads already designed around Spark.
+
+
+---
+
+
+## Official references
+
+- [Cloud Storage documentation](https://cloud.google.com/storage/docs)
+- [Storage classes](https://cloud.google.com/storage/docs/storage-classes)
+- [Object Lifecycle Management](https://cloud.google.com/storage/docs/lifecycle)
+- [Uniform bucket-level access](https://cloud.google.com/storage/docs/uniform-bucket-level-access)
+- [Encryption](https://cloud.google.com/storage/docs/encryption)
+- [gcloud storage](https://cloud.google.com/sdk/gcloud/reference/storage)
+- [GCS Pub/Sub notifications](https://cloud.google.com/storage/docs/pubsub-notifications)

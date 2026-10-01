@@ -1,0 +1,521 @@
+---
+title: "Data Governance with Knowledge Catalog"
+description: "Knowledge Catalog fundamentals for data assets, metadata, discovery, governance and lineage."
+---
+
+# Data Governance with Knowledge Catalog
+
+## Overview
+
+**Knowledge Catalog** is Google's current data catalog and governance platform, formerly known as **Dataplex Universal Catalog**.
+
+It provides capabilities for:
+
+- Data discovery
+- Metadata management
+- Business context
+- Data governance
+- Data quality
+- Data lineage
+- Data-product discovery
+- Context for analytics and AI
+
+A simple mental model is:
+
+```text
+Data assets
+     ↓
+Metadata
+     ↓
+Discovery + Context
+     ↓
+Governance
+     ↓
+Trust
+     ↓
+Analytics / AI / Data Products
+```
+
+---
+
+## Learning objectives
+
+Understand:
+
+- Data assets
+- Technical metadata
+- Business metadata
+- Search and discovery
+- Policy/governance concepts
+- Data lineage
+
+---
+
+## 1. Why data governance?
+
+A data platform can contain thousands or millions of assets.
+
+Without governance, users may ask:
+
+- What does this table contain?
+- Who owns it?
+- Is it production data?
+- Is it trustworthy?
+- Which column represents customer ID?
+- Where did this data come from?
+- Can I use this data?
+- What downstream reports depend on it?
+
+Governance provides the context needed to answer these questions.
+
+---
+
+## 2. Data assets
+
+A data asset is a discoverable data resource in the organization's data estate.
+
+Examples can include:
+
+- BigQuery datasets/tables
+- Cloud Storage data
+- Database assets
+- Other supported data resources
+- Data products and related metadata
+
+Conceptually:
+
+```text
+Data platform
+
+GCS
+ ├── raw/customer.parquet
+ └── raw/order.parquet
+
+BigQuery
+ ├── customer
+ ├── orders
+ └── sales_summary
+
+        ↓
+
+Knowledge Catalog
+        ↓
+Cataloged / discoverable assets
+```
+
+---
+
+## 3. Metadata
+
+Metadata is **data about data**.
+
+Two useful categories are:
+
+### Technical metadata
+
+Examples:
+
+- Table name
+- Column name
+- Data type
+- Location
+- Schema
+- Source system
+- Creation/update information
+- Relationships
+- Lineage
+
+Example:
+
+```text
+customer_id
+type: STRING
+source: CRM
+classification: identifier
+```
+
+### Business metadata
+
+Examples:
+
+- Business definition
+- Data owner
+- Steward
+- Business glossary term
+- Criticality
+- Domain
+- Certification/trust status
+- Usage guidance
+
+Example:
+
+```text
+Customer ID
+
+Business definition:
+Unique identifier assigned to a customer.
+
+Owner:
+Customer Data Domain
+
+Criticality:
+High
+```
+
+---
+
+## 4. Search and discovery
+
+Knowledge Catalog allows users to discover data assets using search.
+
+A user might search:
+
+```text
+"customer sales"
+```
+
+and find:
+
+```text
+customer_master
+customer_orders
+sales_summary
+customer_sales_360
+```
+
+Search can use metadata and filtering.
+
+The goal is:
+
+> **Find the right data without already knowing where it is stored.**
+
+---
+
+## 5. Business glossary
+
+A business glossary standardizes business terminology.
+
+Example:
+
+```text
+Term:
+Active Customer
+
+Definition:
+A customer with at least one completed purchase
+during the previous 90 days.
+```
+
+This prevents different teams from using different definitions for the same business concept.
+
+---
+
+## 6. Data quality
+
+Governance also requires knowing whether data is trustworthy.
+
+Examples of quality checks:
+
+- Null percentage
+- Uniqueness
+- Valid values
+- Freshness
+- Completeness
+- Distribution changes
+
+Conceptually:
+
+```text
+Table
+ ↓
+Quality scan
+ ↓
+Quality metrics
+ ↓
+Trust / governance decision
+```
+
+---
+
+## 7. Enforce policies
+
+Governance is broader than documentation.
+
+Policies can control:
+
+- Who can access data
+- What data can be accessed
+- How sensitive data is classified
+- What transformations are required
+- Retention requirements
+- Data quality expectations
+
+Important distinction:
+
+> **Knowledge Catalog provides catalog/governance context and workflows, but actual access enforcement is performed by the relevant Google Cloud security/IAM and data-service controls.**
+
+For example:
+
+```text
+Catalog / governance
+       ↓
+Identify sensitive asset
+       ↓
+Policy requirement
+       ↓
+IAM / BigQuery / GCS controls
+       ↓
+Access enforced
+```
+
+---
+
+## 8. Data lineage
+
+Data lineage answers:
+
+> **Where did this data come from and where does it go?**
+
+Example:
+
+```text
+CRM
+ ↓
+GCS raw
+ ↓
+Dataflow
+ ↓
+BigQuery customer
+ ↓
+customer_360
+ ↓
+Looker dashboard
+```
+
+Lineage helps with:
+
+- Impact analysis
+- Troubleshooting
+- Compliance
+- Data-quality investigations
+- Understanding transformations
+- Identifying upstream/downstream dependencies
+
+---
+
+## 9. Technical lineage vs business understanding
+
+Lineage tells you:
+
+```text
+Table A → Pipeline B → Table C
+```
+
+Metadata tells you:
+
+```text
+Table C
+Owner: Sales Analytics
+Purpose: Executive sales reporting
+```
+
+Business glossary tells you:
+
+```text
+"Net Revenue"
+= Revenue - Discounts - Returns
+```
+
+Together they provide much more useful context than lineage alone.
+
+---
+
+## 10. Knowledge Catalog and data products
+
+A data product should not simply be:
+
+```text
+Table
+```
+
+A better conceptual model is:
+
+```text
+Data assets
+     +
+Metadata
+     +
+Business definitions
+     +
+Quality
+     +
+Ownership
+     +
+Lineage
+     +
+Access/governance
+     ↓
+Data Product
+```
+
+This makes the data product discoverable and usable by its intended consumers.
+
+---
+
+## 11. Example: Customer 360 data product
+
+Imagine the organization has:
+
+```text
+CRM
+ERP
+E-commerce
+Mobile app
+```
+
+Data is processed into:
+
+```text
+customer_360
+```
+
+Knowledge Catalog can provide context such as:
+
+```text
+Name:
+Customer 360
+
+Owner:
+Customer Data Domain
+
+Purpose:
+Unified customer analytical view
+
+Sources:
+CRM, ERP, E-commerce
+
+Quality:
+Certified
+
+Lineage:
+CRM → Dataflow → BigQuery → customer_360
+
+Business terms:
+Customer
+Active Customer
+Net Revenue
+```
+
+Now an analyst can discover the data product and understand it before using it.
+
+---
+
+## 12. Governance architecture
+
+A simplified enterprise model:
+
+```text
+                    Governance
+                         |
+       +-----------------+-----------------+
+       |                 |                 |
+   Metadata           Quality          Lineage
+       |                 |                 |
+       +-----------------+-----------------+
+                         |
+                 Knowledge Catalog
+                         |
+        +----------------+----------------+
+        |                |                |
+      GCS            BigQuery          Other
+        |                |                |
+        +----------------+----------------+
+                         |
+                    Data Consumers
+```
+
+Security and access controls operate across the underlying services.
+
+---
+
+## 13. Knowledge Catalog vs IAM
+
+These are complementary.
+
+### Knowledge Catalog
+
+Answers:
+
+> What is this data?  
+> Who owns it?  
+> What does it mean?  
+> Where did it come from?  
+> Can I discover it?
+
+### IAM / data-service controls
+
+Answer:
+
+> Am I allowed to access it?
+
+Example:
+
+```text
+Knowledge Catalog
+     ↓
+Discover customer_salary
+     ↓
+Metadata says: Highly sensitive
+     ↓
+IAM / BigQuery policy
+     ↓
+Access permitted or denied
+```
+
+---
+
+## 14. Knowledge Catalog vs Data Pipeline
+
+Another important distinction:
+
+### Data pipeline
+
+Moves and transforms data.
+
+```text
+Source
+ ↓
+Dataflow
+ ↓
+BigQuery
+```
+
+### Governance/catalog
+
+Provides context and control around the data.
+
+```text
+Data
+ ↓
+Metadata
+ ↓
+Discovery
+ ↓
+Quality
+ ↓
+Lineage
+ ↓
+Governance
+```
+
+They work together rather than replacing each other.
+
+---
+
+## Official references
+
+- [Knowledge Catalog documentation](https://cloud.google.com/knowledge-catalog/docs)
+- [Metadata overview](https://cloud.google.com/knowledge-catalog/docs/metadata-overview)
+- [Search](https://cloud.google.com/knowledge-catalog/docs/search-syntax)
+- [Data lineage](https://cloud.google.com/knowledge-catalog/docs/about-data-lineage)
+- [Data products](https://cloud.google.com/knowledge-catalog/docs/data-products-overview)

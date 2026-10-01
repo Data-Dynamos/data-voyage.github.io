@@ -1,0 +1,327 @@
+---
+title: "Google Cloud Data Product Solution Overview"
+description: "An onboarding overview of how Google Cloud services work together across data ingestion, processing, storage, analytics, AI, governance, and consumption."
+---
+
+# Google Cloud Data Product Solution Overview
+
+## Introduction
+
+A **data product solution in Google Cloud** can be understood as a set of integrated capabilities that takes data from multiple sources, processes and stores it, turns it into insights or AI-ready assets, and makes those outcomes available to business users and applications.
+
+The diagram below provides a **conceptual view of the Google Cloud data and AI ecosystem**. It should not be interpreted as a mandatory architecture or a fixed sequence of services. The services selected depend on the business use case, data characteristics, latency requirements, processing complexity, governance requirements, and consumption pattern.
+
+Alongside these stages, **governance, metadata, security, networking, and operational capabilities** provide the foundation needed to make the data platform reliable and usable at enterprise scale.
+
+
+## 1. Understanding the Overall Structure
+
+The diagram can be explained through six major stages:
+
+| Stage | Purpose | Typical Google Cloud services |
+|---|---|---|
+| **Collect** | Bring data and events into the platform | Pub/Sub, Datastream, Database Migration Service, Storage Transfer Service |
+| **Process** | Transform, enrich, clean, validate, and orchestrate data | Dataflow, Managed Service for Apache Spark / Dataproc, Cloud Data Fusion, Cloud Composer, Dataprep |
+| **Store** | Persist operational, analytical, and application data | BigQuery, Cloud Storage, Cloud SQL, Spanner, Bigtable, Firestore, Memorystore |
+| **Analyze** | Query data and generate insights | BigQuery, BigQuery ML, BI Engine, Looker |
+| **Activate** | Turn data into ML, AI, recommendations, predictions, and intelligent solutions | Vertex AI, AutoML, MLOps, Generative AI, AI solutions |
+| **Empower** | Make insights and capabilities available to users and applications | Looker, Connected Sheets, AppSheet, Firebase, Analytics Hub |
+
+These stages are **logical capabilities rather than strict pipeline steps**. A solution may use only a subset of them.
+
+---
+
+## 2. Collect – Getting Data into Google Cloud
+
+The **Collect** layer is responsible for bringing data into the platform from enterprise systems, SaaS applications, databases, IoT devices, applications, and other external sources.
+
+### Common services
+
+#### Pub/Sub
+
+**Pub/Sub** is a managed messaging and event-ingestion service.
+
+It is commonly used when:
+
+- Data arrives continuously as events.
+- Applications need asynchronous communication.
+- Multiple consumers need to receive the same events.
+- A streaming pipeline needs a scalable ingestion layer.
+
+A common pattern is:
+
+```text
+Applications / IoT / Events
+            ↓
+         Pub/Sub
+            ↓
+       Dataflow
+            ↓
+        BigQuery
+```
+
+For simple Pub/Sub-to-BigQuery ingestion where no significant transformation is required, a **Pub/Sub BigQuery subscription** can sometimes remove the need for a separate Dataflow job.
+
+#### Datastream
+
+Datastream provides change data capture (CDC) capabilities for continuously replicating changes from supported operational databases into downstream systems.
+
+It is useful when a data platform needs near-real-time replication of database changes.
+
+#### Database Migration Service
+
+Database Migration Service is primarily used for migrating supported databases into Google Cloud.
+
+#### Storage Transfer Service
+
+Used to transfer data between storage systems and into Google Cloud Storage.
+
+---
+
+## 3. Process – Transforming and Preparing Data
+
+Once data has been collected, it often needs to be transformed before it can be used effectively.
+
+Typical processing activities include:
+
+- Data cleansing
+- Schema transformation
+- Deduplication
+- Data enrichment
+- Joining data from multiple sources
+- Aggregation
+- Validation
+- Streaming transformations
+- Batch ETL/ELT
+- Data quality processing
+
+### Dataflow
+
+**Dataflow** is a fully managed service for batch and streaming processing based on Apache Beam.
+
+Use Dataflow when you need:
+
+- Streaming transformations
+- Event-time processing
+- Windowing
+- Stateful processing
+- Complex streaming pipelines
+- Batch processing
+- Custom transformation logic
+
+Example:
+
+```text
+Pub/Sub
+   ↓
+Dataflow
+   ├── Clean
+   ├── Validate
+   ├── Enrich
+   └── Transform
+   ↓
+BigQuery / Cloud Storage / other sinks
+```
+
+### Dataproc / Managed Service for Apache Spark
+
+Use managed Spark when the workload is naturally suited to the Apache Spark ecosystem.
+
+Typical scenarios include:
+
+- Large-scale batch processing
+- Existing Spark workloads
+- PySpark / Spark SQL applications
+- Complex distributed transformations
+- Migration of existing Hadoop/Spark workloads
+
+### Cloud Data Fusion
+
+Cloud Data Fusion provides a visual, low-code/no-code approach for building data integration pipelines.
+
+It can be useful when teams want to create integration pipelines without implementing every transformation programmatically.
+
+### Cloud Composer
+
+Cloud Composer is a managed Apache Airflow service used primarily for **workflow orchestration**.
+
+It is important to distinguish orchestration from processing:
+
+```text
+Composer
+   |
+   +---- Start Dataflow job
+   |
+   +---- Start Spark job
+   |
+   +---- Run BigQuery SQL
+   |
+   +---- Validate result
+   |
+   +---- Trigger downstream process
+```
+
+Composer generally coordinates tasks; it is not itself the primary engine for large-scale data transformation.
+
+---
+
+## 4. Store – Persisting Data
+
+The **Store** layer provides the persistence required by the solution.
+
+Different storage technologies are selected based on access patterns rather than using one database for every requirement.
+
+### BigQuery
+
+**BigQuery** is Google's serverless analytical data warehouse.
+
+It is commonly used for:
+
+- Enterprise analytics
+- Large-scale SQL
+- Data marts
+- Reporting
+- Aggregations
+- BI workloads
+- ML through BigQuery ML
+
+For many analytical data products, BigQuery is the primary serving and analytics layer.
+
+### Cloud Storage
+
+Cloud Storage is commonly used as an object-storage/data-lake layer for:
+
+- Raw data
+- Files
+- Logs
+- JSON
+- CSV
+- Parquet
+- Avro
+- Images/documents
+- Intermediate datasets
+
+A common architecture is:
+
+```text
+Source systems
+      ↓
+Cloud Storage  ← raw / landing data
+      ↓
+Processing
+      ↓
+BigQuery      ← curated analytical data
+```
+
+### Operational databases
+
+Google Cloud also provides specialized databases for transactional and application workloads:
+
+- **Cloud SQL** – managed relational databases
+- **Spanner** – globally scalable relational database
+- **Bigtable** – wide-column database for high-scale, low-latency workloads
+- **Firestore** – NoSQL document database for applications
+- **Memorystore** – in-memory caching
+
+
+> **Choose storage based on the workload and access pattern, not simply based on the amount of data.**
+
+---
+
+## 5. Analyze – Turning Data into Insights
+
+After data is prepared and stored, analytical services turn the data into useful information.
+
+### BigQuery
+
+BigQuery is commonly the central analytical engine.
+
+It can be used for:
+
+- SQL analytics
+- Data marts
+- Aggregations
+- Reporting datasets
+- Ad-hoc analysis
+- Scheduled transformations
+- BigQuery ML
+
+### BigQuery ML
+
+BigQuery ML allows certain ML models to be created and evaluated using SQL directly in BigQuery.
+
+This can be useful when:
+
+- Data already resides in BigQuery.
+- The model can be expressed using supported BigQuery ML capabilities.
+- The team wants to minimize movement of data between systems.
+
+### BI Engine
+
+BI Engine can accelerate supported analytical queries used by BI workloads.
+
+### Looker
+
+Looker provides a business intelligence and semantic modeling layer that helps business users explore governed data and create dashboards and reports.
+
+---
+
+
+
+---
+
+# 8. Knowledge Catalog – The Governance and Context Layer
+
+The diagram shows **Dataplex** across the data platform. For current Google Cloud terminology, this should be presented as:
+
+> **Knowledge Catalog (formerly Dataplex Universal Catalog)**
+
+Knowledge Catalog provides capabilities for discovering, organizing, governing, and enriching data assets with business context.
+
+It can help organizations with:
+
+- Data discovery
+- Metadata management
+- Data lineage
+- Data quality
+- Business glossary
+- Data governance
+- Business context
+- Data product discovery
+- AI/agent grounding
+
+
+---
+
+# 9. Enterprise Capabilities – The Foundation
+
+The bottom section of the diagram represents capabilities that support the entire platform.
+
+These should not be treated as a separate final step. They are **cross-cutting capabilities**.
+
+### IAM
+
+Identity and Access Management controls who can access which resources.
+
+### Data governance and catalog
+
+Provides metadata, discovery, lineage, data quality, classification, and governance capabilities.
+
+### CMEK
+
+Customer-managed encryption keys can provide additional control over encryption for supported services.
+
+### Disaster recovery
+
+Provides strategies for recovering systems and data after failures.
+
+### Zones and regions
+
+Google Cloud resources can be deployed across regions and zones depending on availability, latency, data residency, and disaster-recovery requirements.
+
+### Networking
+
+Networking provides connectivity between applications, data sources, processing services, databases, and external systems.
+
+---
+
